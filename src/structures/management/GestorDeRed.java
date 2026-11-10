@@ -7,40 +7,113 @@ import java.util.stream.Collectors;
 /**
  * GestorDeRed - Módulo Integrador de Estructuras de Datos
  * VERSION ESTUDIANTE
- *
- * Parte de Santiago: TODOs 6, 7, 8, 9 y 10.
- * (Los TODOs 1-5 son de su compañero y se pegan en este mismo archivo.)
  */
 public class GestorDeRed {
-
-    // Historial de eventos (lo usa el TODO 10)
+    // 1. Historial de Eventos: Registro lineal de todas las actividades
     private List<String> historialEventos;
 
-    // 4. Topología de la Red: grafo como lista de adyacencia
-    //    clave = id de estación, valor = lista de estaciones conectadas
+    // 2. Navegador de Alertas: Permite moverse adelante y atrás entre alertas
+    private Deque<String> navegadorAlertas;
+    private String alertaActual;
+
+    // 3. Ciclo de Monitoreo: Gestión de la rotación de sensores a consultar
+    private Queue<String> colaMonitoreo;
+
+    // 4. Topología de la Red: Grafo de conexiones entre estaciones (Lista de adyacencia)
     private Map<String, List<String>> topologiaRed;
 
-    // 5. Buffer de Ingesta: cola FIFO de lecturas pendientes
+    // 5. Buffer de Ingesta: Cola de espera para procesar lecturas entrantes
     private Queue<LecturaSensor> bufferIngesta;
 
     public GestorDeRed() {
         this.historialEventos = new ArrayList<>();
+        this.navegadorAlertas = new ArrayDeque<>();
+        this.colaMonitoreo = new ArrayDeque<>();
         this.topologiaRed = new HashMap<>();
         this.bufferIngesta = new ArrayDeque<>();
     }
 
     // =========================================================================
-    // TODO 10: LIMPIEZA DE HISTORIAL
+    // SECCIÓN 1: HISTORIAL Y EVENTOS
     // =========================================================================
+
+    public void agregarEvento(String evento) {
+        // TODO 1: Implementar la adición del evento al historial.
+        // Debe registrarse la fecha/hora actual junto con la descripción del evento.
+        String registro = "[" + new java.util.Date() + "] " + evento;
+        historialEventos.add(registro);
+    }
+
+    public List<String> obtenerEventosRecientes(int limite) {
+        if (historialEventos.size() <= limite) return new ArrayList<>(historialEventos);
+        return historialEventos.subList(historialEventos.size() - limite, historialEventos.size());
+    }
 
     public void limpiarHistorialAntiguo(int mantener) {
         // TODO 10 (Santiago): Conservar solo los últimos 'mantener' eventos
         int sobran = historialEventos.size() - mantener;
         if (sobran > 0) {
-            // subList es una vista; clear() borra ese rango con un solo desplazamiento, O(n)
-            // (remove(0) en bucle sería O(n·k))
-            historialEventos.subList(0, sobran).clear();
+            historialEventos.subList(0, sobran).clear(); // un solo desplazamiento, O(n)
         }
+    }
+
+    // =========================================================================
+    // SECCIÓN 2: NAVEGACIÓN DE ALERTAS
+    // =========================================================================
+
+    public void registrarAlerta(String alerta) {
+        navegadorAlertas.addLast(alerta);
+        alertaActual = alerta;
+    }
+
+    public String navegarAlSiguiente() {
+        // TODO 2: Lógica de desplazamiento hacia adelante usando Deque.
+        // Extrae del frente y reubica al final para avanzar en ciclo continuo.
+        if (navegadorAlertas.isEmpty()) {
+            alertaActual = null;
+            return null;
+        }
+        String siguiente = navegadorAlertas.pollFirst();
+        navegadorAlertas.addLast(siguiente);
+        alertaActual = siguiente;
+        return alertaActual;
+    }
+
+    public String navegarAlAnterior() {
+        // TODO 3: Lógica de desplazamiento hacia atrás usando Deque.
+        // Extrae del final y reubica al frente para retroceder en ciclo continuo.
+        if (navegadorAlertas.isEmpty()) {
+            alertaActual = null;
+            return null;
+        }
+        // La alerta actual es siempre la del final: se manda al frente
+        // y la nueva actual pasa a ser la que quedó al final.
+        navegadorAlertas.addFirst(navegadorAlertas.pollLast());
+        alertaActual = navegadorAlertas.peekLast();
+        return alertaActual;
+    }
+
+    public String getAlertaActual() { return alertaActual; }
+
+    // =========================================================================
+    // SECCIÓN 3: CICLO DE MONITOREO
+    // =========================================================================
+
+    public void programarConsulta(String idSensor) {
+        // TODO 4: Evitar duplicados con contains()
+        if (idSensor != null && !colaMonitoreo.contains(idSensor)) {
+            colaMonitoreo.offer(idSensor);
+        }
+    }
+
+    public String obtenerSiguienteSensor() {
+        // TODO 5: Rotación del ciclo (extraer del frente y volver a insertar al final)
+        if (colaMonitoreo.isEmpty()) {
+            return null;
+        }
+        String sensor = colaMonitoreo.poll();
+        colaMonitoreo.offer(sensor);
+        return sensor;
     }
 
     // =========================================================================
@@ -49,11 +122,9 @@ public class GestorDeRed {
 
     public void registrarConexion(String sensorA, String sensorB) {
         // TODO 6 (Santiago): Registrar conexión bidireccional evitando duplicados
-        // computeIfAbsent: si la estación no existe en el mapa, crea su lista vacía
         topologiaRed.computeIfAbsent(sensorA, k -> new ArrayList<>());
         topologiaRed.computeIfAbsent(sensorB, k -> new ArrayList<>());
 
-        // Conexión en ambos sentidos, sin repetir vecinos
         if (!topologiaRed.get(sensorA).contains(sensorB)) {
             topologiaRed.get(sensorA).add(sensorB);
         }
@@ -64,7 +135,6 @@ public class GestorDeRed {
 
     public List<String> obtenerVecinos(String idSensor) {
         // TODO 7 (Santiago): Consultar vecinos con getOrDefault
-        // Si la estación no existe devuelve lista vacía en vez de null
         return topologiaRed.getOrDefault(idSensor, Collections.emptyList());
     }
 
@@ -96,7 +166,6 @@ public class GestorDeRed {
 
     public LecturaSensor procesarSiguienteLectura() {
         // TODO 8 (Santiago): Procesar FIFO con poll()
-        // poll() saca la lectura más antigua, o devuelve null si la cola está vacía
         return bufferIngesta.poll();
     }
 
